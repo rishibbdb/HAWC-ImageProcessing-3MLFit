@@ -1,4 +1,4 @@
-# HAWC Image processing source finding pipeline using 3ML likelihood fitting  
+# HAWC Source Analysis Framework (Source Seeding Framework + Likelihood Framework)  
 
 Automated pipeline scripts for detection and analysis of gamma ray sources with a combination of the likelihood framework and the source fitting framework. The details of the source seeding framework based on image processing can be found on the Github (https://github.com/rishibbdb/WFS-Source-Detector).
 

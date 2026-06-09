@@ -70,9 +70,3 @@ resume:
   # Available steps: 'initial_map', 'source_detection_1', 'initial_fit', 
   #                 'ps_add_1', 'ps_test_1', ..., 'ext_test_1', ..., 
   #       
-
-advanced:
-  freeze_background: false  # Freeze background parameters after initial fit
-  freeze_spatial_params_after_first_fit: true  # Freeze spatial params in source tests
-  use_profile_likelihood: false  # Use profile likelihood for parameter estimation
-  significance_map_smoothing: 2  # Smoothing kernel for significance maps

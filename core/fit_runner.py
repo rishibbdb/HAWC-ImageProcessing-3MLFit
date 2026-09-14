@@ -10,8 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-
-from pipeline_fitmodel import threeMLFit
+import astromodels
+from core.pipeline_fitmodel import threeMLFit
 
 
 @dataclass
@@ -40,6 +40,7 @@ class FitResult:
     model: object
     log_like: float
     aic: float
+    ts : float
     model_map_path: Optional[Path]
     residual_map_path: Optional[Path]
     step_dir: Path
@@ -63,7 +64,7 @@ class FitRunner:
         between attempts.
     """
 
-    def __init__(self, config_path: str, logger: object, roi_template: str = None, max_retries: int = 3):
+    def __init__(self, config_path: str, logger: object, roi_template: str = None, max_retries: int = 1):
         self.config_path = config_path
         self.logger = logger
         self.roi_template = roi_template
@@ -74,51 +75,30 @@ class FitRunner:
         model_file: str,
         step_dir: str,
         compute_err: bool = True,
+        compute_TS: bool = True,
         make_maps: bool = True,
     ) -> FitResult:
-        """Run one in-process fit.
-
-        Parameters:
-        -----------
-        model_file : str
-            Path to the .model file to fit (an executable Python file that
-            defines `model = threeML.Model(...)`).
-        step_dir : str
-            Output directory for this step; threeMLFit writes maps under
-            step_dir/results/.
-        compute_err : bool
-            If True use hal_fit_with_covariance(), else hal_fit().
-        make_maps : bool
-            If True, write model_fit.hd5 and residual_fit.hd5 via make_maps().
-
-        Returns:
-        --------
-        FitResult
-        """
         step_dir = Path(step_dir)
-        (step_dir / 'results').mkdir(parents=True, exist_ok=True)
 
         start = time.perf_counter()
         last_error = None
         fitter = None
-        for attempt in range(self.max_retries):
-            try:
-                fitter = threeMLFit(
-                    config_path=self.config_path,
-                    model=str(model_file),
-                    save_dir=step_dir,
-                    roiTemplate=self.roi_template,
-                    logger=self.logger,
-                )
-                if compute_err:
-                    fitter.hal_fit_with_covariance()
-                else:
-                    fitter.hal_fit()
-                break
-            except Exception as e:
-                last_error = e
-                self.logger.warning(f'Fit attempt {attempt + 1}/{self.max_retries} failed: {e}')
-                fitter = None
+        ts = None
+        self.logger.info(f'Fitting model {model_file} in {step_dir}  with compute_err={compute_err}, compute_TS={compute_TS}, make_maps={make_maps}')
+
+        fitter = threeMLFit(
+            config_path=self.config_path,
+            model=str(model_file),
+            save_dir=step_dir,
+            roiTemplate=self.roi_template,
+            logger=self.logger,
+        )
+        if compute_err:
+            fitter.hal_fit_with_covariance()
+        else:
+            fitter.hal_fit()
+        if compute_TS:
+            ts = fitter.get_TS()
         if fitter is None:
             raise RuntimeError(f'Fit at {model_file} failed after {self.max_retries} attempts: {last_error}')
 
@@ -129,8 +109,8 @@ class FitRunner:
         residual_map_path = None
         if make_maps:
             fitter.make_maps()
-            mm = step_dir / 'results' / 'model_fit.hd5'
-            rm = step_dir / 'results' / 'residual_fit.hd5'
+            mm = step_dir / 'model_fit.hd5'
+            rm = step_dir / 'residual_fit.hd5'
             model_map_path = mm if mm.exists() else None
             residual_map_path = rm if rm.exists() else None
 
@@ -141,12 +121,12 @@ class FitRunner:
             model=fitter.model_obj,
             log_like=log_like,
             aic=aic,
+            ts=ts,
             model_map_path=model_map_path,
             residual_map_path=residual_map_path,
             step_dir=step_dir,
             fitter=fitter,
         )
-
     def _extract_aic(self, fitter) -> float:
         """Pull AIC from the threeML MLEResults.
 

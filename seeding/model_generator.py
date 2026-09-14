@@ -192,7 +192,7 @@ class ModelGenerator:
         morphology.sigma = sigma_radius * u.degree
         morphology.sigma.free = True
         if sigma_bounds is None:
-            sigma_bounds = (0.01, 3.0)
+            sigma_bounds = (0.01, 4.0)
         morphology.sigma.bounds = tuple(b * u.degree for b in sigma_bounds)
         
         # Create extended source
@@ -357,9 +357,9 @@ class ModelGenerator:
     # actually offered in a given run's `fitting.alternate_spatial_models`
     # need an entry here; add one per new shape as it's adopted.
     DEFAULT_SPATIAL_PARAMS = {
-        'Gaussian_on_sphere': {'sigma': (0.3, 0.01, 3.0)},
-        'Disk_on_sphere': {'radius': (0.3, 0.01, 3.0)},
-        'Ellipse_on_sphere': {'a': (0.3, 0.01, 3.0), 'e': (0.5, 0.0, 0.99), 'theta': (0.0, -90.0, 90.0)},
+        'Gaussian_on_sphere': {'sigma': (0.3, 0.01, 4.0)},
+        'Disk_on_sphere': {'radius': (0.3, 0.01, 4.0)},
+        'Ellipse_on_sphere': {'a': (0.3, 0.01, 4.0), 'e': (0.5, 0.0, 0.99), 'theta': (0.0, -90.0, 90.0)},
     }
     DEFAULT_SPECTRUM_PARAMS = {
         'Log_parabola': {'K': (1e-23,1e-29,1e-19), 'alpha': (-2.5, -4.0, -1.0), 'beta': (0.1, -1.0, 1.0)},
@@ -654,27 +654,53 @@ class ModelGenerator:
                     logger.info(f"SOURCE {name} : param {pname} -> FIXED (not in param_names)")
                     param.free = False
 
-    # @staticmethod
-    # def _clone_shape(shape):
-    #     """Deep-copy a live astromodels shape (spatial or spectral) by value.
-
-    #     Avoids reusing the same Parameter-tree node across two Source
-    #     objects (astromodels shapes are parented to one owner).
-    #     """
-    #     # print(f"Cloning shape {shape.__class__.__name__} with parameters: {list(shape.parameters.keys())}")
-    #     # import inspect
-    #     # print(inspect.signature(type(shape).__init__))
-    #     # new_shape = type(shape)()
-    #     # for pname, param in shape.parameters.items():
-    #     #     target = getattr(new_shape, pname)
-    #     #     target.value = param.value
-    #     #     target.free = param.free
-    #     #     if param.min_value is not None and param.max_value is not None:
-    #     #         target.bounds = (param.min_value, param.max_value)
-    #     # return new_shape
+    from astromodels.functions.function import FunctionInstanceError
     @staticmethod
     def _clone_shape(shape):
-        return copy.deepcopy(shape)
+        """Reconstruct a spatial/spectral shape from its parameter values,
+        rather than copy.deepcopy(shape). Some shapes (e.g. those bound to a
+        fitted HAL model) hold live PSF/convolution state that does not survive
+        pickle-based deepcopy -- astromodels' __deepcopy__ round-trips via
+        cPickle, and unpickled PSFWrapper objects can come back marked invalid
+        (hawc_hal.psf_fast.psf_wrapper.InvalidPSFError). Reconstructing by value
+        sidesteps that entirely.
+        """
+        shape_cls = type(shape)
+
+        if shape_cls.__name__ == 'Hermes':
+            # Hermes requires fits_file/ihdu at construction time -- these are
+            # available as attributes on the existing shape, not as ordinary
+            # fittable parameters, so they need to be passed explicitly rather
+            # than discovered via shape.parameters.
+            new_shape = shape_cls(fits_file=shape.fits_file.value, ihdu=shape.ihdu.value)
+            for pname, param in shape.parameters.items():
+                target = getattr(new_shape, pname, None)
+                if target is None:
+                    continue
+                target.value = param.value
+                target.free = param.free
+                if param.min_value is not None and param.max_value is not None:
+                    target.bounds = (param.min_value, param.max_value)
+            return new_shape
+
+        try:
+            new_shape = shape_cls()
+        except (TypeError, FunctionInstanceError):
+            # Constructor requires args we can't infer generically and we have
+            # no specific by-value path for this class -- deepcopy is the last
+            # resort; it may still fail for PSF-bound shapes, but there's
+            # nothing more targeted to try.
+            return copy.deepcopy(shape)
+
+        for pname, param in shape.parameters.items():
+            target = getattr(new_shape, pname, None)
+            if target is None:
+                continue
+            target.value = param.value
+            target.free = param.free
+            if param.min_value is not None and param.max_value is not None:
+                target.bounds = (param.min_value, param.max_value)
+        return new_shape
 
     @staticmethod
     def remove_sources(model: Model, exclude_names: List[str], logger: Optional[object] = None) -> Model:
@@ -782,14 +808,17 @@ class ModelGenerator:
         return Model(*other_sources, new_source)
 
     @staticmethod
-    def _clone_source(source, logger: Optional[object] = None):
+    def _clone_source(source, logger: Optional[object] = None, new_name: Optional[str] = None):
         """Deep-copy a live Source (point or extended) by value, for reuse
-        in a rebuilt Model alongside a swapped sibling source."""
+        in a rebuilt Model alongside a swapped sibling source. Pass new_name
+        to reconstruct under a different name (e.g. to avoid a collision when
+        merging sources from a separate model)."""
+        name = new_name if new_name is not None else source.name
         spectrum = ModelGenerator._clone_shape(source.spectrum.main.shape)
         if hasattr(source, 'position'):
             logger.debug(f"Source {source.name} is a PointSource with position RA={source.position.ra.value}, Dec={source.position.dec.value}")
             new_source = PointSource(
-                source.name, ra=source.position.ra.value, dec=source.position.dec.value,
+                name, ra=source.position.ra.value, dec=source.position.dec.value,
                 spectral_shape=spectrum,
             )
             new_source.position.ra.free = source.position.ra.free
@@ -801,6 +830,66 @@ class ModelGenerator:
         elif hasattr(source, 'spatial_shape'):
             logger.debug(f"Source {source.name} is an ExtendedSource with spatial shape {source.spatial_shape.__class__.__name__}")
             spatial = ModelGenerator._clone_shape(source.spatial_shape)
-            logger.debug(f"Cloned spatial shape for {source.name}")
-            new_source = ExtendedSource(source.name, spatial_shape=spatial, spectral_shape=spectrum)
+            new_source = ExtendedSource(name, spatial_shape=spatial, spectral_shape=spectrum)
         return new_source
+
+
+    @staticmethod
+    def merge_new_sources(base_model: Model, new_sources_model_path: str,
+                        dedup_radius_deg: float = 0.1, logger: Optional[object] = None) -> Model:
+        """Load new_sources_model_path (e.g. from a DRIPS reseed run on a
+        residual map) and add any sources it defines that aren't already
+        present in base_model, by position (both models reuse generic names
+        like 'Source0', so name comparison isn't meaningful). New sources are
+        renamed 'ReseedSource{n}' to avoid colliding with base_model's names.
+        Existing base_model sources are cloned unchanged. URM is never
+        compared/duplicated -- there is at most one diffuse template per model.
+        """
+        namespace = {'threeML': threeML}
+        exec(open(new_sources_model_path).read(), namespace)
+        if 'model' not in namespace:
+            raise ValueError(f"{new_sources_model_path} did not define 'model'")
+        candidate_model = namespace['model']
+
+        def _position(source):
+            if hasattr(source, 'position'):
+                return source.position.ra.value, source.position.dec.value
+            return source.spatial_shape.lon0.value, source.spatial_shape.lat0.value
+
+        existing_positions = [
+            _position(s) for name, s in base_model.sources.items() if name != 'URM'
+        ]
+        kept = [ModelGenerator._clone_source(s, logger) for s in base_model.sources.values()]
+        existing_names = set(base_model.sources.keys())
+        next_index = 0
+        added = 0
+
+        for cname, csource in candidate_model.sources.items():
+            if cname == 'URM':
+                logger.info('Skipping URM in candidate model (diffuse template is never merged as a new source)')
+                continue
+
+            cra, cdec = _position(csource)
+
+            is_duplicate = any(
+                ((cra - era) ** 2 + (cdec - edec) ** 2) ** 0.5 < dedup_radius_deg
+                for era, edec in existing_positions
+            )
+            if is_duplicate:
+                logger.info(f'{cname} at ({cra:.3f}, {cdec:.3f}) matches an existing source within {dedup_radius_deg} deg; skipping as duplicate')
+                continue
+
+            new_name = f'ReseedSource{next_index}'
+            while new_name in existing_names:
+                next_index += 1
+                new_name = f'ReseedSource{next_index}'
+            existing_names.add(new_name)
+            next_index += 1
+
+            kept.append(ModelGenerator._clone_source(csource, logger, new_name=new_name))
+            existing_positions.append((cra, cdec))
+            added += 1
+            logger.info(f'Added new source {new_name} (from {cname}) at ({cra:.3f}, {cdec:.3f})')
+
+        logger.info(f'merge_new_sources: {added} new source(s) added, {len(candidate_model.sources) - added - (1 if "URM" in candidate_model.sources else 0)} skipped as duplicates')
+        return Model(*kept)

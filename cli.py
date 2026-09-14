@@ -14,8 +14,8 @@ import argparse
 import sys
 from pathlib import Path
 from core.config import ConfigManager
-from pipeline import HAWCAnalysisPipeline
-from fit_runner import FitResult
+from core.pipeline import HAWCAnalysisPipeline
+from core.fit_runner import FitResult
 
 
 def main(argv=None) -> int:
@@ -29,6 +29,12 @@ def main(argv=None) -> int:
         "--seed-only", action="store_true",
         help="Override coordinates.generate_seed_only to True (DRIPS detection only, no fit)",
     )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="Resume an interrupted Drips run from the furthest-completed step "
+             "(skips re-seeding and any per-source extension/spectrum tests "
+             "already completed), instead of starting over from scratch",
+    )
     args = parser.parse_args(argv)
 
     config = ConfigManager(args.config)
@@ -37,7 +43,7 @@ def main(argv=None) -> int:
     if args.seed_only:
         config.config.setdefault("coordinates", {})["generate_seed_only"] = True
 
-    pipeline = HAWCAnalysisPipeline(config)
+    pipeline = HAWCAnalysisPipeline(config, resume=args.resume)
     output = pipeline.run()
 
     if isinstance(output, FitResult):

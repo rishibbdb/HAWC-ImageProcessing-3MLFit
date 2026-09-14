@@ -7,7 +7,7 @@ setup(
     name="hawc-analysis",
     version="1.0.0",
     author="HAWC Collaboration",
-    author_email="hawc@example.com",
+    author_email="rbabu@mtu.com",
     description="HAWC Gamma-ray Source Analysis Pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -34,7 +34,7 @@ setup(
         "threeml>=3.0",
         "astromodels>=4.0",
         "scikit-image>=0.18",
-        "hawc_hal",  # Your institution's HAWC fitting library
+        "hawc_hal",
     ],
     extras_require={
         "dev": [

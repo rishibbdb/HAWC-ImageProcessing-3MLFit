@@ -25,7 +25,7 @@ from typing import Optional
 
 import pandas as pd
 
-from pipeline_fitmodel import threeMLFit
+from core.pipeline_fitmodel import threeMLFit
 
 
 @dataclass

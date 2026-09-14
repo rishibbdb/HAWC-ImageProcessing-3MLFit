@@ -74,8 +74,8 @@ class threeMLFit:
             self.roi_ra = skycoord.icrs.ra.deg
             self.roi_dec = skycoord.icrs.dec.deg
             self.logger.info(f"Converted galactic coordinates (l={l}, b={b}) to equatorial (RA={self.roi_ra}, Dec={self.roi_dec})")
-        self.roi_radius = 10
-        self.roi_radius_model = 15
+        self.roi_radius = 15
+        self.roi_radius_model = 20
         self.roiThreshold = 0.5
         self.error_samples = 5000
         self.logger.info(f"Model file: {model}")
@@ -106,7 +106,8 @@ class threeMLFit:
         self.hawc.set_active_measurements(bin_list=self.bin_list)
         self.datalist = DataList(self.hawc)
         self.jl = JointLikelihood(self.model_obj, self.datalist, verbose=True)
-        self.jl.set_minimizer("ROOT")
+        # self.jl.set_minimizer("ROOT")
+        self.jl.set_minimizer("minuit")
 
     def circleDist(self, RA1, DEC1, RA2, DEC2):
         c1 = SkyCoord(ra=RA1, dec=DEC1, unit="degree")
@@ -209,7 +210,14 @@ class threeMLFit:
         self.logger.info("Running MLE with error estimation")
         self.params, self.statistics = self.jl.fit(compute_covariance=True, n_samples=self.error_samples)
         self.jl.results.display()
-        self.errAll = self.jl.get_errors()
+        try:
+            self.errAll = self.jl.get_errors()
+        except threeML.minimizer.minimization.MINOSFailed as e:
+            self.logger.warning(
+                f"MINOS error estimation failed ({e}); keeping the already-converged fit "
+                f"without asymmetric errors."
+            )
+            self.errAll = None
         self.jl.results.write_to("{0}/likelihoodResults.fits".format(self.save_dir), overwrite=True)
         self.logger.info(f"Fit results saved to {self.save_dir / 'likelihoodResults.fits'}")
 
@@ -239,7 +247,7 @@ class threeMLFit:
         large_like.set_active_measurements(bin_list=self.bin_list)
 
         large_jl = threeML.JointLikelihood( self.model_obj, self.datalist)
-        large_jl.set_minimizer("root")
+        large_jl.set_minimizer("minuit")
 
         large_like.set_model(self.model_obj)
         large_like.get_log_like()

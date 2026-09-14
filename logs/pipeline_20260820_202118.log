@@ -1,8 +1,0 @@
-2026-08-20 20:21:18 - Pipeline - INFO - Pipeline logger initialized
-2026-08-20 20:21:18 - Pipeline - INFO - Log level: INFO
-2026-08-20 20:21:18 - Pipeline - INFO - Pipeline log: logs/pipeline_20260820_202118.log
-2026-08-20 20:21:18 - Pipeline - INFO - Full log: logs/full_log_20260820_202118.log
-2026-08-20 20:21:18 - Pipeline - INFO - Pipeline test
-2026-08-20 20:21:18 - Pipeline - INFO - Initialized DirectoryManager at /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/hawc_analysis/Run1
-2026-08-20 20:21:18 - Pipeline - INFO - Directory structure created at /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/hawc_analysis/Run1
-2026-08-20 20:21:18 - Pipeline - INFO - Converted galactic coordinates (l=13.5, b=0) to equatorial (RA=273.72100167883474, Dec=-17.222738748900706)

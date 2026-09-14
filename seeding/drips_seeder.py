@@ -1,18 +1,3 @@
-"""
-DRIPS Seeder (Image-based Source Detection)
-
-Extracted from: pipeline_sourcedetector.py (SourceSeedDetector class)
-Detection Radius-based Image Processing for Sources.
-
-Uses difference-of-gaussians blob detection across multiple smear radii to
-detect point-source and extended-source seeds from a HAWC significance map,
-then builds a threeML seed model.
-
-All method bodies are extracted verbatim from SourceSeedDetector. The only
-additions are: type hints, docstrings, an optional logger, and the
-SeedingModule interface wrapper (run() -> SeedingOutput).
-"""
-
 import os
 import re
 import sys
@@ -36,10 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import yaml
 
-# Helpers extracted to core.data_loading, core.plotting, core.model_generator.
-# The original module did `from pipeline_helpers import *`; these are the
-# helper functions that module exposed and this class relies on.
-from seeding.pipeline_helpers import (
+
+from core.pipeline_helpers import (
     load_hawc_data,
     make_plots,
     soft_floor,
@@ -58,100 +41,81 @@ from seeding.pipeline_helpers import (
     threeML_model_from_sources,
 )
 
-from seeding.base import SeedingModule, SeedingOutput
 
-
-class DRIPSSeeder(SeedingModule):
-    """DRIPS image-based source detection seeder.
-
-    Wraps the original SourceSeedDetector algorithm in the SeedingModule
-    interface. Detection logic is unchanged from pipeline_sourcedetector.py.
-
-    Attributes:
-    -----------
-    config : object
-        ConfigManager instance (dot-notation .get()).
-    logger : object
-        PipelineLogger instance.
-    directory_manager : object
-        DirectoryManager instance.
-    """
-
+class DRIPSSeeder():
+    """A class to manage the seeding of Drips."""
     def __init__(
         self,
         config: object,
         logger: object,
         directory_manager: object,
-        step_path: Optional[str] = None,
-        data_loader: object = None,
-        plotting: object = None,
-        model_generator: object = None,
+        step_path,
+        sig_map_path_override: Optional[str] = None,
     ):
-        """Initialize DRIPS seeder.
+        self.config = config
+        self.logger = logger
+        self.directory_manager = directory_manager
+        self.step_path = step_path
 
-        Parameters:
-        -----------
-        config : object
-            ConfigManager instance.
-        logger : object
-            PipelineLogger instance.
-        directory_manager : object
-            DirectoryManager instance.
-        step_path : str, optional
-            Explicit step directory; results written to step_path/results.
-            If None, falls back to config 'paths.main_dir' + '/SourceDetection'.
-        data_loader, plotting, model_generator : object, optional
-            Utility classes (auto-imported from core by base class).
-        """
-        super().__init__(
-            config, logger, directory_manager,
-            data_loader, plotting, model_generator,
-        )
-
-        # ---- extracted verbatim from SourceSeedDetector.__init__ ----
-        self.initialmap = self.config.get('coordinates.sig_map_path')
-        self.coord_sys = self.config.get('coordinates.coord_sys')
-        self.use_dbe = self.config.get('paths.use_dbe')
-
-        if self.use_dbe is True:
-            self.dbe_template = self.config.get('paths.hermes_template')
+        if sig_map_path_override is not None:
+            self.initialmap = sig_map_path_override
+            logger.info(f"Using overridden significance map: {self.initialmap}")
         else:
-            self.dbe_template = None
+            try:
+                self.initialmap = self.config.get('coordinates.sig_map_path')
+                if self.initialmap is None:
+                    raise ValueError("sig_map_path is not set in the config")
+                logger.info(f"Using significance map from config: {self.initialmap}")
+            except Exception as e:
+                self.initialmap = directory_manager.get_datamap_dir() / 'significance_map.fits'
+                logger.info(f"Using significance map created: {self.initialmap}")
 
+        self.coord_sys = self.config.get('coordinates.coord_sys')
         if self.coord_sys not in ['C', 'G']:
             raise ValueError(f"Invalid coordinate system '{self.coord_sys}' in config. Must be 'C' or 'G'.")
         if self.coord_sys == 'C':
-            if self.config.get('coordinates.l') is None:
+            if self.config.get('coordinates.ra') is not None:
                 self.ra = float(self.config.get('coordinates.ra'))
                 self.dec = float(self.config.get('coordinates.dec'))
                 central_coord = SkyCoord(ra=self.ra*u.degree, dec=self.dec*u.degree, frame='icrs')
                 self.l = central_coord.galactic.l.deg
                 self.b = central_coord.galactic.b.deg
             else:
+                raise ValueError("Coordinates not provided.")
+        else:
+            if self.config.get('coordinates.l') is not None or self.config.get('coordinates.b') is not None:
                 self.l = float(self.config.get('coordinates.l'))
                 self.b = float(self.config.get('coordinates.b'))
+                
+            else:
+                raise ValueError("Coordinates not provided.")
         self.seed_coord_sys = 'G'
         self.x_length = self.config.get('coordinates.roi_x', 1.0)
         self.y_length = self.config.get('coordinates.roi_y', 1.0)
-        if self.x_length <= 2:
+        if self.x_length < 2:
             self.x_length += 3
-        if self.y_length <= 2:
+        if self.y_length < 2:
             self.y_length += 3
+        
+        self.out_dir = step_path
+        self.logger.info(f"Using galactic coordinates from config: (l={self.l}, b={self.b})")
+        self.logger.info(f"ROI size: {self.x_length}° x {self.y_length}°")
+        self.logger.info(f"Output directory for seeding: {self.out_dir}")
 
-        if step_path:
-            self.out_dir = str(Path(step_path) / 'results')
+        self.use_dbe = self.config.get('diffuse.use_diffuse_background')
+        if self.use_dbe is True:
+            self.dbe_template = self.config.get('diffuse.diffuse_template_path')
         else:
-            self.save_dir = self.config.get('fitting.output_dir')
-            self.out_dir = self.save_dir + "/SourceDetection"
+            self.dbe_template = None
+        self.logger.info(f"Running seed model search in {self.out_dir}")
         os.makedirs(self.out_dir, exist_ok=True)
         self.SIG_THRESHOLD = 5.0
         self.SMEAR_RADII = [0.25, 0.3, 0.4, 0.5]
 
     def load_hawc_data(self) -> None:
         """Load significance map and set array, wcs, dims, pixel size."""
-        self.array, self.header, self.wcs, self.xnum, self.ynum, self.pixel_size = load_hawc_data(
-            self.initialmap, self.l, self.b, self.x_length, self.y_length, self.seed_coord_sys
-        )
+        self.logger.info(f"Loading HAWC data from {self.initialmap}")
+        self.array, self.header, self.wcs, self.xnum, self.ynum, self.pixel_size = load_hawc_data( self.initialmap, self.l, self.b, self.x_length, self.y_length, self.seed_coord_sys )
 
     def plot_maps(
         self,
@@ -184,13 +148,14 @@ class DRIPSSeeder(SeedingModule):
     def normalise_image(self, array: np.ndarray) -> None:
         """Soft-floor and min-max normalise the significance map to [0,1]."""
         if np.max(self.array) < self.SIG_THRESHOLD:
-            print(f"    Below threshold ({np.max(self.array):.2f} < {self.SIG_THRESHOLD}sigma) — skipping.")
+            self.logger(f"    Below threshold ({np.max(self.array):.2f} < {self.SIG_THRESHOLD}sigma) — skipping.")
             fig_blank, ax_blank = plt.subplots(figsize=(8.5, 4))
             ax_blank.axis('off')
             ax_blank.text(0.5, 0.5,
                             f"No data > {self.SIG_THRESHOLD}sigma in file\n"
                             f"(Max = {np.max(self.array):.2f}sigma)",
                             fontsize=12, ha='center', va='center')
+            raise ValueError(f"No excess found in the region")
         else:
             print(f"  Max significance {np.max(self.array):.2f}sigma exceeds threshold {self.SIG_THRESHOLD}sigma — proceeding with analysis.")
         if np.min(self.array) < -5:
@@ -584,6 +549,7 @@ class DRIPSSeeder(SeedingModule):
                 raise ValueError("hermes_path must be provided when hermes_present=True")
 
             lines += [
+                "import astromodels",
                 "##################################BEGINSOURCE##################################",
                 'source_name = "URM"',
                 "",
@@ -616,7 +582,7 @@ class DRIPSSeeder(SeedingModule):
             is_extended = hasattr(src, 'spatial_shape')
             ra_val    = filtered_df['ra'].iloc[i]
             dec_val   = filtered_df['dec'].iloc[i]
-
+            
             lines.append("##################################BEGINSOURCE##################################")
             lines.append(f'source_name = "{src_name}"')
 
@@ -635,7 +601,7 @@ class DRIPSSeeder(SeedingModule):
                     "spectrum.K.fix = False",
                     "spectrum.K.bounds = (1e-26 * fluxUnit, 1e-20 * fluxUnit)",
                     "",
-                    f"spectrum.piv = {2} * threeML.u.TeV",
+                    f"spectrum.piv = {10} * threeML.u.TeV",
                     "spectrum.piv.fix = True",
                     "",
                     f"spectrum.index = {sp.index.value}",
@@ -643,9 +609,9 @@ class DRIPSSeeder(SeedingModule):
                     "spectrum.index.bounds = (-3., -1.)",
                     "",
                     f"{key}.position.ra.free = True",
-                    f"{key}.position.ra.bounds = (({ra_val} - 1.0), ({ra_val} + 1.0)) * threeML.u.degree",
+                    f"{key}.position.ra.bounds = (({ra_val} -1.0), ({ra_val} +1.0)) * threeML.u.degree",
                     f"{key}.position.dec.free = True",
-                    f"{key}.position.dec.bounds = (({dec_val} - 1.0), ({dec_val} + 1.0)) * threeML.u.degree",
+                    f"{key}.position.dec.bounds = (({dec_val} -1.0), ({dec_val} +1.0)) * threeML.u.degree",
                 ]
             else:
                 sp    = src.spectrum.main.shape
@@ -660,21 +626,21 @@ class DRIPSSeeder(SeedingModule):
                     "",
                     f"shape.lon0 = {morph.lon0.value} * threeML.u.degree",
                     "shape.lon0.fix = False",
-                    f"shape.lon0.bounds = (({morph.lon0.value} - 1) * threeML.u.degree, ({morph.lon0.value} + 1) * threeML.u.degree)",
+                    f"shape.lon0.bounds = (({morph.lon0.value} -1.0), ({morph.lon0.value} +1.0)) * threeML.u.degree",
                     "",
                     f"shape.lat0 = {morph.lat0.value} * threeML.u.degree",
                     "shape.lat0.fix = False",
-                    f"shape.lat0.bounds = (({morph.lat0.value} - 1) * threeML.u.degree, ({morph.lat0.value} + 1) * threeML.u.degree)",
+                    f"shape.lat0.bounds = (({morph.lat0.value} -1.0), ({morph.lat0.value} +1.0)) * threeML.u.degree",
                     "",
                     f"shape.sigma = {morph.sigma.value}",
                     "shape.sigma.fix = False",
-                    "shape.sigma.bounds = (0.01, 2.0)",
+                    "shape.sigma.bounds = (0.01, 3.0)",
                     "",
                     f"spectrum.K = {sp.K.value:.3e} * fluxUnit",
                     "spectrum.K.fix = False",
                     "spectrum.K.bounds = (1e-26 * fluxUnit, 1e-20 * fluxUnit)",
                     "",
-                    f"spectrum.piv = {2} * threeML.u.TeV",
+                    f"spectrum.piv = {10} * threeML.u.TeV",
                     "spectrum.piv.fix = True",
                     "",
                     f"spectrum.index = {sp.index.value}",
@@ -731,12 +697,16 @@ class DRIPSSeeder(SeedingModule):
         self.save_model()
         self.plot_maps(self.array, self.wcs, self.pixel_size, self.seed_coord_sys, self.max_signif, -5, 15, 5, contour=True, title='Source Seeds', hotspots=self.filtered_df, labels=['4haaawc'])
 
-    def _run(self) -> None:
+    def run(self) -> None:
         """Original SourceSeedDetector.run(): detection + threeML model file.
 
         Extracted verbatim; produces filtered_df, allmodel, sources, and the
         curModel.model file.
         """
+        if 'curModel.model' in os.listdir(self.out_dir):
+            self.logger.info(f"Found existing model file in {self.out_dir}, skipping seeding.")
+            model_path = Path(self.out_dir) / 'curModel.model'
+            return model_path
         self.run_blob_detection()
         self.run_filtering()
         self.plot_filtering_results(title='FilteredBlobs_Labels')
@@ -749,50 +719,5 @@ class DRIPSSeeder(SeedingModule):
             hermes_present     = self.use_dbe,
             hermes_path        = self.dbe_template,
         )
-
-    def run(self) -> SeedingOutput:
-        """Run DRIPS seeding and return a standardized SeedingOutput.
-
-        Wraps the original detection+model pipeline (_run) and packages its
-        products into the SeedingModule interface.
-
-        Returns:
-        --------
-        SeedingOutput
-            source_info_db      : filtered source catalog (self.filtered_df)
-            baseline_model_path : path to curModel.model
-            residual_map_path   : significance map used (self.initialmap)
-            method              : 'DRIPS'
-        """
-        self.log_seeding_start('DRIPS')
-
-        self._run()
-
-        num_ps = len(self.ps_filtered_group)
-        num_ext = len(self.ext_filtered_group)
-        num_sources = len(self.filtered_df)
-
         model_path = Path(self.out_dir) / 'curModel.model'
-
-        output = SeedingOutput(
-            source_info_db=self.filtered_df,
-            baseline_model_path=model_path,
-            baseline_likelihood=float('nan'),   # DRIPS seeding does no fit; filled by later fit step
-            baseline_params={},
-            ts_values={},
-            residual_map_path=Path(self.initialmap) if self.initialmap else Path(self.out_dir),
-            checkpoint_data={
-                'method': 'DRIPS',
-                'num_ps': num_ps,
-                'num_ext': num_ext,
-                'num_sources': num_sources,
-            },
-            num_sources=num_sources,
-            num_iterations=1,
-            method='DRIPS',
-            significance_map_path=Path(self.initialmap) if self.initialmap else None,
-            wcs=self.wcs,
-        )
-
-        self.log_seeding_complete('DRIPS', num_sources, 1, output.baseline_likelihood)
-        return output
+        return model_path

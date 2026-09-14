@@ -26,12 +26,12 @@ from core.config import ConfigManager
 from core.logger import PipelineLogger
 from core.checkpoint import CheckpointManager
 from core.directory_manager import DirectoryManager
-from map_tools import MapGenerator
+from core.map_tools import MapGenerator
 from seeding.base import SeedingOutput
-from drips_seeder import DRIPSSeeder
+from seeding.drips_seeder import DRIPSSeeder
 from seeding.alps_seeder import ALPSSeeder
-import source_fitter
-from fit_runner import FitResult  # add this import
+import core.source_fitter as source_fitter
+from core.fit_runner import FitResult  # add this import
 
 class HAWCAnalysisPipeline:
     """Config-driven orchestrator: builds sig map (if needed), seeds, fits.
@@ -41,10 +41,13 @@ class HAWCAnalysisPipeline:
     config : str or ConfigManager
         Path to the unified pipeline config YAML, or an already-constructed
         ConfigManager.
+    resume : bool
+        If True, attempt to resume from a previous run if possible.
     """
 
-    def __init__(self, config: Union[str, ConfigManager]):
+    def __init__(self, config: Union[str, ConfigManager], resume: bool = False):
         self.config = config if isinstance(config, ConfigManager) else ConfigManager(str(config))
+        self.resume = resume
 
         self.method = self.config.get('fitting_procedure', 'Drips')
         if self.method not in ('Drips', 'Alps'):
@@ -131,8 +134,8 @@ class HAWCAnalysisPipeline:
             detector_response=detector_response,
             ra_center=float(self.config.get('coordinates.ra')),
             dec_center=float(self.config.get('coordinates.dec')),
-            roi_x=float(self.config.get('coordinates.roi_x', 4.0)*2.5),
-            roi_y=float(self.config.get('coordinates.roi_y', 4.0)*2),
+            roi_x=float(self.config.get('coordinates.roi_y', 4.0)*3),
+            roi_y=float(self.config.get('coordinates.roi_y', 4.0)*3),
             output_file=str(sig_map_path),
             logger=self.logger,
             pixi_manifest_path=self.config.get('alps.pixi_aerie_folder'),
@@ -161,13 +164,29 @@ class HAWCAnalysisPipeline:
         Returns the DRIPS model file Path if generate_seed_only is set,
         else the final FitResult from source_fitter.run()."""
         step_dir = self.directory_manager.get_step_results_dir('Step0-Allpoint-sources')
-        self.checkpoint.save_step('drips_seeding', 0, 'running', {})
-        seeder = DRIPSSeeder(self.config, self.logger, self.directory_manager, step_path=str(step_dir))
-        drips_output = seeder.run()  # Path to the generated .model file
-        self.logger.info(f"DRIPS seeding completed: model written to {drips_output}")
-        self.checkpoint.save_step(
-            'drips_seeding', 0, 'completed', {'model_path': str(drips_output)},
-        )
+        # self.checkpoint.save_step('drips_seeding', 0, 'running', {})
+        # seeder = DRIPSSeeder(self.config, self.logger, self.directory_manager, step_path=str(step_dir))
+        # drips_output = seeder.run()  # Path to the generated .model file
+        # self.logger.info(f"DRIPS seeding completed: model written to {drips_output}")
+        # self.checkpoint.save_step(
+        #     'drips_seeding', 0, 'completed', {'model_path': str(drips_output)},
+        # )
+        if self.resume:
+            self.logger.info('resume=True: skipping DRIPS re-seeding, using existing model file')
+            drips_output = step_dir / 'curModel.model'
+            if not drips_output.exists():
+                raise FileNotFoundError(
+                    f'--resume was passed but no existing seed model found at {drips_output}; '
+                    f'cannot resume without a prior drips_seeding run'
+                )
+        else:
+            self.checkpoint.save_step('drips_seeding', 0, 'running', {})
+            seeder = DRIPSSeeder(self.config, self.logger, self.directory_manager, step_path=str(step_dir))
+            drips_output = seeder.run()
+            self.logger.info(f"DRIPS seeding completed: model written to {drips_output}")
+            self.checkpoint.save_step(
+                'drips_seeding', 0, 'completed', {'model_path': str(drips_output)},
+            )
 
         if self.config.get('coordinates.generate_seed_only', False):
             self.logger.info("coordinates.generate_seed_only is True; returning DRIPS detection output without fitting")
@@ -175,7 +194,18 @@ class HAWCAnalysisPipeline:
 
         self.checkpoint.save_step('drips_fit', 0, 'running', {})
 
-        fit_output = source_fitter.run(drips_output, self.config, self.logger, self.directory_manager, self.checkpoint)
+        # fit_output = source_fitter.run(drips_output, self.config, self.logger, self.directory_manager, self.checkpoint)
+        # num_sources = len(fit_output.model.sources)
+        # self.checkpoint.save_step(
+        #     'drips_fit', 0, 'completed',
+        #     {'log_like': fit_output.log_like, 'aic': fit_output.aic, 'num_sources': num_sources},
+        #     metadata={'num_sources': num_sources},
+        # )
+        # return fit_output
+        fit_output = source_fitter.run(
+            drips_output, self.config, self.logger, self.directory_manager, self.checkpoint,
+            resume=self.resume,
+        )
         num_sources = len(fit_output.model.sources)
         self.checkpoint.save_step(
             'drips_fit', 0, 'completed',

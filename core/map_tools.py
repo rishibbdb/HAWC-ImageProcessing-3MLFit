@@ -103,7 +103,6 @@ class MapGenerator:
         
         # Adjust declination if negative (HAWC convention)
         dec_adjusted = dec_center if dec_center >= 0 else 360 + dec_center
-        
         # Build aerie-apps-HealpixSigFluxMap command
         pixi_prefix = ["pixi", "run"]
         if pixi_manifest_path is not None:

@@ -1,27 +1,26 @@
 ##Select fitting procedure
 fitting_procedure: 'Drips'  # Options: 'Drips', 'Alps' ##If fitting_procedure is 'Drips', specify the following parameters: coord_sys, roi_x and roi_y (in degrees) for the region of interest around the source, and the coordinate system (C for celestial, G for galactic).
 coordinates:  
-  coord_sys: 'C'    #Coordinate system: C for celestial, G for galactic  
-  ra: 307.65    #Specify the right ascension (RA) or longitude (L) in degrees for the center of the region of interest (ROI)   
-  dec: 41    #Specify the declination (Dec) or latitude (B) in degrees for the center of the region of interest (ROI)  
-  l: null
-  b: null
-  roi_x: 4.0  #Specify the size of the region of interest (ROI) in degrees along the x-axis (RA or L)  
+  coord_sys: 'G'    #Coordinate system: C if ra and dec, G if l and b
+  ra: null    #Specify the right ascension (RA) or longitude (L) in degrees for the center of the region of interest (ROI)   
+  dec: null   #Specify the declination (Dec) or latitude (B) in degrees for the center of the region of interest (ROI)  
+  l: 45.75
+  b: 0
+  roi_x: 2.75  #Specify the size of the region of interest (ROI) in degrees along the x-axis (RA or L)  
   roi_y: 4.0   #Specify the size of the region of interest (ROI) in degrees along the y-axis (Dec or B)  
   create_sig_map: true  #Set to true if you want to generate a significance map for the ROI, false otherwise  
   # sig_map_path: /Users/rishi/Documents/Analysis/data/aligned-ml-wholesky-neg-ext0.0.fits.gz #if sig_map is true, specify the path to your precomputed sigmap  
-  # sig_map_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/hawc_analysis/mahsa.fits
-  count_map_dir: /Users/rishi/Documents/Analysis/data/fhitcountmaps/  #if sig_map is true, specify the directory containing your count maps   
-  image_bins : [B2C0, B3C0, B4C0, B5C0, B6C0, B7C0, B8C0, B9C0, B10C0, ] #B5C0, B6C0, B7C0, B8C0, B9C0, B10C0] #if sig_map is true, specify the bins to be used for the significance map generation 
+  count_map_dir: /Users/rishi/Documents/Analysis/data/nncoutmaps/  #if sig_map is true, specify the directory containing your count maps   
+  image_bins : [B2C0Ec, B2C0Ed, B2C0Ee, B3C0Ec, B3C0Ed, B3C0Ee, B3C0Ef, B4C0Ec, B4C0Ed, B4C0Ee, B4C0Ef, B5C0Ec, B5C0Ed, B5C0Ee, B5C0Ef, B5C0Eg, B6C0Ed, B6C0Ee, B6C0Ef, B6C0Eg, B6C0Eh, B7C0Ee, B7C0Ef, B7C0Eg, B7C0Eh, B7C0Ei, B8C0Ef, B8C0Eg, B8C0Eh, B8C0Ei, B8C0Ej, B9C0Ef, B9C0Eg, B9C0Eh, B9C0Ei, B9C0Ej, B9C0Ek, B10C0Eg, B10C0Eh, B10C0Ei, B10C0Ej, B10C0Ek, B10C0El] #B5C0, B6C0, B7C0, B8C0, 
   generate_seed_only: false  #Set to true if you want to generate a seed model only, without performing the full fitting procedure, false otherwise
-  detector_response: /Users/rishi/Documents/Analysis/data/detRes-fhit2pct-pass5f-mlp-refit.root #Path to detector response file  
-  
+  detector_response: /Users/rishi/Documents/Analysis/data/detRes-nn-pass5f_ML-refit.root #Path to detector response file
 fitting:  
-  map_tree: /Users/rishi/Documents/Analysis/data/maptree-fhit2pct-pass5f-mlp-chunk1-1510.root #Path to maptree file  
-  detector_response: /Users/rishi/Documents/Analysis/data/detRes-fhit2pct-pass5f-mlp-refit.root #Path to detector response file  
-  estimator: P5_nhit #Choose the estimator to be used for the fitting procedure. Options: P5_nhit, P5_NN_2D, P5_GP_2D  
-  bins: [B2C0, B3C0, B4C0, B5C0, B6C0, B7C0, B8C0, B9C0, B10C0, ] #B5C0, B6C0, B7C0, B8C0, B9C0, B10C0] #bins to be used for the fitting procedure  
-  fit_name: 'Cocoon' #Name for the fit, used for output files  
+  map_tree: /Users/rishi/Documents/Analysis/data/Pass5-Final-NN-maptree-ch103-ch1510-ML.root #Path to maptree file  
+  detector_response: /Users/rishi/Documents/Analysis/data/detRes-nn-pass5f_ML-refit.root 
+  #Path to detector response file  
+  estimator: P5_NN_2D #Choose the estimator to be used for the fitting procedure. Options: P5_nhit, P5_NN_2D, P5_GP_2D  
+  bins: [B2C0Ec, B2C0Ed, B2C0Ee, B3C0Ec, B3C0Ed, B3C0Ee, B3C0Ef, B4C0Ec, B4C0Ed, B4C0Ee, B4C0Ef, B5C0Ec, B5C0Ed, B5C0Ee, B5C0Ef, B5C0Eg, B6C0Ed, B6C0Ee, B6C0Ef, B6C0Eg, B6C0Eh, B7C0Ee, B7C0Ef, B7C0Eg, B7C0Eh, B7C0Ei, B8C0Ef, B8C0Eg, B8C0Eh, B8C0Ei, B8C0Ej, B9C0Ef, B9C0Eg, B9C0Eh, B9C0Ei, B9C0Ej, B9C0Ek, B10C0Eg, B10C0Eh, B10C0Ei, B10C0Ej, B10C0Ek, B10C0El] #
+  fit_name: 'GRS' #Name for the fit, used for output files  
   output_dir: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/hawc_analysis/ #Directory where the output files will be saved  
   no_retries: 3 #Number of retries for the fitting procedure in case of failure
   alternate_spectral_models: ['Cutoff_powerlaw', 'Log_parabola'] #List of alternate spectral models to be tested during the fitting procedure. Must match installed astromodels/threeML class names exactly, e.g. 'Log_parabola', 'Cutoff_powerlaw', 'Exponential_cutoff' (verified against the pixi threeml env; 'LogParabola'/'ExponentialCutoffPowerLaw' from the old comment don't exist as class names here)
@@ -30,11 +29,12 @@ fitting:
   run_extension_test: true #Set to false to skip the extension test phase entirely (Drips path)
   run_spectrum_test: true #Set to false to skip the spectrum test phase entirely (Drips path)
   run_final_refit: true #Set to false to skip the final joint refit (all params unfrozen) after extension/spectrum testing (Drips path)
+  disable_reseed: true
 
 roi:  
-  roi_radius: 10  
-  use_roi_template: false #Set to true if you want to use a custom ROI template, false otherwise  
-  roi_template_path:  #Path to the custom ROI template, if use_image_seed_roi is true  
+  roi_radius: 5  
+  use_roi_template: true #Set to true if you want to use a custom ROI template, false otherwise  
+  roi_template_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/GRS1915_square.fits
   generate_roi_template: false #if use_roi_template is true and roi_template does not exist, specify if you want to generate a new ROI template or use an existing one. Set to true to generate a new template, false to use an existing one.   
   use_image_seed_roi: false #Set to true if you want to use an image-based seed model for the ROI, false otherwise  
   custom_roi_ra_min: null #Specify the minimum RA (or L) in degrees for the custom ROI template, if use_image_seed_roi is false and use_roi_template is true  
@@ -43,8 +43,9 @@ roi:
   custom_roi_dec_max: null #Specify the maximum Dec (or B) in degrees for the custom ROI template, if use_image_seed_roi is true 
 
 diffuse:
-  use_diffuse_background: False  # Include Diffuse Background Emission -- was `true` with no diffuse_template_path set below; this went unnoticed while DRIPSSeeder read this from a nonexistent `paths.*` key (fixed to `diffuse.*`), which silently disabled it. Set back to true once a real Hermes template path is provided.
-  # diffuse_template_path: /Users/rishi/Documents/Analysis/Sources/J1813/Hermes3D-allchan.fits.gz #Optional path to a DBE template file if use_diffuse_background is true
+  use_diffuse_background: True  # Include Diffuse Background Emission -- was `true` with no diffuse_template_path set below; this went unnoticed while DRIPSSeeder read this from a nonexistent `paths.*` key (fixed to `diffuse.*`), which silently disabled it. Set back to true once a real Hermes template path is provided.
+  diffuse_template_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/Minji-Hermes-allchan.fits.gz
+  # diffuse_template_path: /Users/rishi/Documents/Analysis/data/Hermes-allchan-wH2-large.fits.gz #Optional path to a DBE template file if use_diffuse_background is true
   generate_diffuse_template: false #Set to true if you want to generate a diffuse background template, false otherwise  
   free_diffuse_norm: true #Set to true if you want to free the normalization of the diffuse background model during fitting, false otherwise 
 # testing: 

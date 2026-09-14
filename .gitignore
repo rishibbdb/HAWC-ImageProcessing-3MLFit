@@ -16,3 +16,7 @@ config_files/
 config_files/*
 config_gen.py
 query.py
+hawc_analysis/
+redundant/
+image_source_finder-test.ipynb
+AstroImageDetection-final/

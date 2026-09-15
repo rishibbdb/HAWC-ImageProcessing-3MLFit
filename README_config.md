@@ -30,7 +30,7 @@ The following is an example of the config file used in the analysis.
 - `no_retries: 3` #Number of retries for the fitting procedure in case of failure
 - `alternate_spectral_models: ['Cutoff_powerlaw', 'Log_parabola']` #List of alternate spectral models to be tested during the fitting procedure. Must match installed astromodels/threeML class names exactly, e.g. 'Log_parabola', 'Cutoff_powerlaw', 'Exponential_cutoff'
 - `alternate_spatial_models: ['Gaussian_on_sphere']` #List of alternate spatial (extended-source) models to be tested for the Drips path. Options: 'Disk_on_sphere', 'Ellipse_on_sphere', 'Gaussian_on_sphere'. Empty list skips the extension test.
-- `extended_source_coord_range: 1.0` #Degrees of freedom allowed around an extended-source seed position when the extension test swaps in a new spatial model (Drips path)
+- `extended_source_coord_range: 1.0` #Spatial movement allowed around an extended-source seed position when the extension test swaps in a new spatial model (Drips path)
 - `run_extension_test: true` #Set to false to skip the extension test phase entirely (Drips path)
 - `run_spectrum_test: true` #Set to false to skip the spectrum test phase entirely (Drips path)
 - `run_final_refit: true` #Set to false to skip the final joint refit (all params unfrozen) after extension/spectrum testing (Drips path)
@@ -48,7 +48,7 @@ The following is an example of the config file used in the analysis.
 - `custom_roi_dec_max: null` #Specify the maximum Dec (or B) in degrees for the custom ROI template, if use_image_seed_roi is true 
 
 ## diffuse:
-- `use_diffuse_background: True`  # Include Diffuse Background Emission -- was `true` with no diffuse_template_path set below; this went unnoticed while DRIPSSeeder read this from a nonexistent `paths.*` key (fixed to `diffuse.*`), which silently disabled it. Set back to true once a real Hermes template path is provided.
+- `use_diffuse_background: True`  # Include Diffuse Background Emission 
 - `diffuse_template_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/Minji-Hermes-allchan.fits.gz`
 - `generate_diffuse_template: false` #Set to true if you want to generate a diffuse background template, false otherwise  
 - `free_diffuse_norm: true` #Set to true if you want to free the normalization of the diffuse background model during fitting, false otherwise 

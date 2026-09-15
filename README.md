@@ -92,7 +92,7 @@ This repo currently has two different interfaces available:
 
 ### Image Processing Based FitModel
 
-The source analysis configurations and region parameters are stored in `config.yaml`. Check out [`README_config.md`](./README_config.nd) for description on the configuration parameters. Use `cli.py` to start the fitting process. There are multiple modes available for `cli.py`, described as follows:
+The source analysis configurations and region parameters are stored in `config.yaml`. Check out [`README_config.md`](./README_config.md) for description on the configuration parameters. Use `cli.py` to start the fitting process. There are multiple modes available for `cli.py`, described as follows:
 
 - `python cli.py --config config.yaml --procedure Drips --seed-only` will run the source seeding procedure without the 3ML fit (Useful to lookup where the hotspots land)
 - `python cli.py --config config.yaml --procedure Drips` will run the source seeding + 3ML pipeline fit based on the seeded sources, including the spatial and spectral tests for these sources.

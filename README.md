@@ -16,11 +16,13 @@ Automated pipeline scripts for detection and analysis of gamma ray sources with 
 
 **NOTE: The code is currently in alpha build**. Features such as testing different morphology and spectrum models are not currently implemented and will be introduced in beta version dev. 
 
+**NOTE: The code is currently in beta build**
+
 ## Future implementation. 
-- Full analysis chain starting with finding sources based on the image processing-based seeding and generating a final model 
-- Testing different morphological and spectral models
-- Implement detailed logging in multiple level log files. 
-- Implement a checkpoint function to resume fitting of models from the last successful fit during the event of a model failure. 
+- ALPS Fitting Adapter not built in
+- Implement more detailed logs (human and machine readable)
+- Implement generation of HERMES Diffuse Emission Templates
+- Implement generation of ROI Templates
 
 
 ### Requirements
@@ -34,7 +36,7 @@ Automated pipeline scripts for detection and analysis of gamma ray sources with 
 
 ### Setup
 
-[Installation instructions](https://github.com/HAWC-Data-Release/aerie)
+[Installation instructions](https://github.com/HAWC-Data-Release/aerie) [ This link will be active once data release is open to testing for the collaboration ]
 
 Installation is based on Pixi, a modern package manager built on conda-forge and PyPI. 
 
@@ -83,13 +85,25 @@ pip install PyYAML
 
 ``` 
 
-# Map Maker - Quick Guide
+## Interaces Available
+This repo currently has two different interfaces available:
+- `Fitting Module`
+- `Map Making Module`
+
+### Image Processing Based FitModel
+
+The source analysis configurations and region parameters are stored in `config.yaml`. Check out [`README_config.md`](./README_config.nd) for description on the configuration parameters. Use `cli.py` to start the fitting process. There are multiple modes available for `cli.py`, described as follows:
+
+- `python cli.py --config config.yaml --procedure Drips --seed-only` will run the source seeding procedure without the 3ML fit (Useful to lookup where the hotspots land)
+- `python cli.py --config config.yaml --procedure Drips` will run the source seeding + 3ML pipeline fit based on the seeded sources, including the spatial and spectral tests for these sources.
+- `python cli.py --config config.yaml --procedure ALPS` [NOT IMPLEMENTED] will run the ALPS source search pipeline fit
+
 
 Simple script for converting HDF5 to FITS and generating Healpix maps.
 
-## Two Modes
+### Map Maker Modes - Quick Guide
 
-### Mode 1: HDF5 → FITS → Maps
+#### Mode 1: HDF5 → FITS → Maps
 Convert HDF5 map tree file to FITS, then generate map.
 
 ```bash
@@ -113,7 +127,7 @@ python map_maker.py hdf5 \
 - `--roi-x, --roi-y` - ROI radius
 - `--det-res` - Detector response file
 
-### Mode 2: FITS Only (Manual Bins)
+#### Mode 2: FITS Only (Manual Bins)
 Use existing FITS files with a manual bin list.
 
 ```bash
@@ -133,14 +147,14 @@ python map_maker.py fits \
 - `--roi-x, --roi-y` - ROI radius
 - `--det-res` - Detector response file
 
-## Common Options (Both Modes)
+### Common Options (Both Modes)
 
 - `-v, --verbose` - Show debug output
 - `--log-file FILE` - Save logs to file
 
-## Examples
+### Examples
 
-### Example 1: Convert residual HDF5 with verbose output
+#### Example 1: Convert residual HDF5 with verbose output
 ```bash
 python map_maker.py hdf5 \
   -d analysis/results \
@@ -154,7 +168,7 @@ python map_maker.py hdf5 \
   -v
 ```
 
-### Example 2: Convert model HDF5 with logging
+#### Example 2: Convert model HDF5 with logging
 ```bash
 python map_maker.py hdf5 \
   -d analysis/results \
@@ -167,7 +181,7 @@ python map_maker.py hdf5 \
   --log-file model_conversion.log
 ```
 
-### Example 3: Use existing FITS with custom bins
+#### Example 3: Use existing FITS with custom bins
 ```bash
 python map_maker.py fits \
   -d maps/residual \
@@ -178,7 +192,7 @@ python map_maker.py fits \
   --det-res detector.fits
 ```
 
-### Example 4: Batch processing multiple HDF5 files
+#### Example 4: Batch processing multiple HDF5 files
 ```bash
 for file in analysis/results/*_fit.hd5; do
   name=$(basename "$file" _fit.hd5)
@@ -193,7 +207,7 @@ for file in analysis/results/*_fit.hd5; do
 done
 ```
 
-## Output Structure
+### Output Structure
 
 **Mode 1 (HDF5):**
 ```
@@ -210,81 +224,3 @@ data_directory/
 └── map.fits  ← Final output
 ```
 
-## Workflow
-
-### Step 1: Fit your data (creates HDF5)
-```bash
-# Your fitting code creates:
-# analysis/residual_fit.hd5
-# analysis/model_fit.hd5
-```
-
-### Step 2: Convert to FITS and make maps
-```bash
-# Convert residual
-python map_maker.py hdf5 \
-  -d analysis \
-  -f residual_fit.hd5 \
-  -o maps/residual \
-  --ra 273.38 --dec 342.23 --roi-x 5 --roi-y 5 \
-  --det-res detector.fits
-
-# Convert model
-python map_maker.py hdf5 \
-  -d analysis \
-  -f model_fit.hd5 \
-  -o maps/model \
-  --ra 273.38 --dec 342.23 --roi-x 5 --roi-y 5 \
-  --det-res detector.fits
-```
-
-### Step 3: Reprocess with different parameters (optional)
-```bash
-# Already have FITS files, just reprocess with new window
-python map_maker.py fits \
-  -d maps/residual \
-  -b B7C0Ej B8C0Ej B9C0Ej \
-  --ra 280.0 --dec 350.0 --roi-x 8 --roi-y 8 \
-  --det-res detector.fits \
-  -M residual_new_window.fits
-```
-
-## Requirements
-
-```bash
-pip install numpy healpy astropy hawc_hal
-```
-
-Also need:
-- `pixi` with `aerie-apps-HealpixSigFluxMap` available
-
-## Troubleshooting
-
-**Issue: HDF5 file not found**
-- Check `-d` and `-f` paths
-- Verify file exists: `ls -la data_directory/filename.hd5`
-
-**Issue: No FITS files found in Mode 2**
-- Check bin names match filenames (case-sensitive)
-- List directory contents: `ls -la data_directory/*.fits*`
-- Try with full bin names (e.g., `B7C0Ej` not `B7`)
-
-**Issue: Detector response file not found**
-- Provide full path: `--det-res /full/path/to/detector.fits`
-
-**Issue: Map generation fails**
-- Enable verbose: add `-v` flag
-- Check pixi: `pixi run aerie-apps-HealpixSigFluxMap --help`
-
-## Exit Codes
-
-- `0` = Success
-- `1` = Error (check output)
-
-## Help
-
-```bash
-python map_maker.py -h                # Show all modes
-python map_maker.py hdf5 -h           # HDF5 mode help
-python map_maker.py fits -h           # FITS mode help
-```

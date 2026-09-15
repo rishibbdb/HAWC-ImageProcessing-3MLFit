@@ -98,8 +98,8 @@ The source analysis configurations and region parameters are stored in `config.y
 - `python cli.py --config config.yaml --procedure Drips` will run the source seeding + 3ML pipeline fit based on the seeded sources, including the spatial and spectral tests for these sources.
 - `python cli.py --config config.yaml --procedure ALPS` [NOT IMPLEMENTED] will run the ALPS source search pipeline fit
 
+Detailed README in progress. 
 
-Simple script for converting HDF5 to FITS and generating Healpix maps.
 
 ### Map Maker Modes - Quick Guide
 

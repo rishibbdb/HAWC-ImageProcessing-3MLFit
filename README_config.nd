@@ -1,0 +1,112 @@
+# CONFIG FILE PARAMETERS
+
+The following is an example of the config file used in the analysis.
+
+##Select fitting procedure
+fitting_procedure: 'Drips'  # Options: 'Drips', 'Alps' 
+##If fitting_procedure is 'Drips', specify the following parameters: coord_sys, roi_x and roi_y (in degrees) for the region of interest around the source, and the coordinate system (C for celestial, G for galactic).
+
+# coordinates:  
+- `coord_sys: 'G'`    #Coordinate system: C if ra and dec, G if l and b
+- `ra: null`    #Specify the right ascension (RA) or longitude (L) in degrees for the center of the region of interest (ROI)   
+- `dec: null`   #Specify the declination (Dec) or latitude (B) in degrees for the center of the region of interest (ROI)  
+- `l: 45.75`
+- `b: 0`
+- `roi_x: 2.75`  #Specify the size of the region of interest (ROI) in degrees along the x-axis (RA or L)  
+- `roi_y: 4.0`   #Specify the size of the region of interest (ROI) in degrees along the y-axis (Dec or B)  
+- `create_sig_map: true`  #Set to true if you want to generate a significance map for the ROI, false otherwise  
+- `sig_map_path: /Users/rishi/Documents/Analysis/data/aligned-ml-wholesky-neg-ext0.0.fits.gz` #if sig_map is true, specify the path to your precomputed sigmap  
+- `count_map_dir: /Users/rishi/Documents/Analysis/data/nncoutmaps/`  #if sig_map is true, specify the directory containing your count maps   
+- `image_bins : [B2C0Ec, B2C0Ed, B2C0Ee, B3C0Ec, B3C0Ed, B3C0Ee, B3C0Ef, B4C0Ec, B4C0Ed, B4C0Ee, B4C0Ef, B5C0Ec, B5C0Ed, B5C0Ee, B5C0Ef, B5C0Eg, B6C0Ed, B6C0Ee, B6C0Ef, B6C0Eg, B6C0Eh, B7C0Ee, B7C0Ef, B7C0Eg, B7C0Eh, B7C0Ei, B8C0Ef, B8C0Eg, B8C0Eh, B8C0Ei, B8C0Ej, B9C0Ef, B9C0Eg, B9C0Eh, B9C0Ei, B9C0Ej, B9C0Ek, B10C0Eg, B10C0Eh, B10C0Ei, B10C0Ej, B10C0Ek, B10C0El]`
+- `generate_seed_only: false`  #Set to true if you want to generate a seed model only, without performing the full fitting procedure, false otherwise
+- `detector_response: /Users/rishi/Documents/Analysis/data/detRes-nn-pass5f_ML-refit.root` #Path to detector response file
+fitting:  
+  map_tree: /Users/rishi/Documents/Analysis/data/Pass5-Final-NN-maptree-ch103-ch1510-ML.root #Path to maptree file  
+  detector_response: /Users/rishi/Documents/Analysis/data/detRes-nn-pass5f_ML-refit.root 
+  #Path to detector response file  
+  estimator: P5_NN_2D #Choose the estimator to be used for the fitting procedure. Options: P5_nhit, P5_NN_2D, P5_GP_2D  
+  bins: [B2C0Ec, B2C0Ed, B2C0Ee, B3C0Ec, B3C0Ed, B3C0Ee, B3C0Ef, B4C0Ec, B4C0Ed, B4C0Ee, B4C0Ef, B5C0Ec, B5C0Ed, B5C0Ee, B5C0Ef, B5C0Eg, B6C0Ed, B6C0Ee, B6C0Ef, B6C0Eg, B6C0Eh, B7C0Ee, B7C0Ef, B7C0Eg, B7C0Eh, B7C0Ei, B8C0Ef, B8C0Eg, B8C0Eh, B8C0Ei, B8C0Ej, B9C0Ef, B9C0Eg, B9C0Eh, B9C0Ei, B9C0Ej, B9C0Ek, B10C0Eg, B10C0Eh, B10C0Ei, B10C0Ej, B10C0Ek, B10C0El] #
+  fit_name: 'GRS' #Name for the fit, used for output files  
+  output_dir: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/hawc_analysis/ #Directory where the output files will be saved  
+  no_retries: 3 #Number of retries for the fitting procedure in case of failure
+  alternate_spectral_models: ['Cutoff_powerlaw', 'Log_parabola'] #List of alternate spectral models to be tested during the fitting procedure. Must match installed astromodels/threeML class names exactly, e.g. 'Log_parabola', 'Cutoff_powerlaw', 'Exponential_cutoff' (verified against the pixi threeml env; 'LogParabola'/'ExponentialCutoffPowerLaw' from the old comment don't exist as class names here)
+  alternate_spatial_models: ['Gaussian_on_sphere'] #List of alternate spatial (extended-source) models to be tested for the Drips path. Options: 'Disk_on_sphere', 'Ellipse_on_sphere', 'Gaussian_on_sphere'. Empty list skips the extension test.
+  extended_source_coord_range: 1.0 #Degrees of freedom allowed around an extended-source seed position when the extension test swaps in a new spatial model (Drips path)
+  run_extension_test: true #Set to false to skip the extension test phase entirely (Drips path)
+  run_spectrum_test: true #Set to false to skip the spectrum test phase entirely (Drips path)
+  run_final_refit: true #Set to false to skip the final joint refit (all params unfrozen) after extension/spectrum testing (Drips path)
+  disable_reseed: true
+
+roi:  
+  roi_radius: 5  
+  use_roi_template: true #Set to true if you want to use a custom ROI template, false otherwise  
+  roi_template_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/GRS1915_square.fits
+  generate_roi_template: false #if use_roi_template is true and roi_template does not exist, specify if you want to generate a new ROI template or use an existing one. Set to true to generate a new template, false to use an existing one.   
+  use_image_seed_roi: false #Set to true if you want to use an image-based seed model for the ROI, false otherwise  
+  custom_roi_ra_min: null #Specify the minimum RA (or L) in degrees for the custom ROI template, if use_image_seed_roi is false and use_roi_template is true  
+  custom_roi_ra_max: null #Specify the maximum RA (or L) in degrees for the custom ROI template, if use_image_seed_roi is true  
+  custom_roi_dec_min: null #Specify the minimum Dec (or B) in degrees for the custom ROI template, if use_image_seed_roi is true  
+  custom_roi_dec_max: null #Specify the maximum Dec (or B) in degrees for the custom ROI template, if use_image_seed_roi is true 
+
+diffuse:
+  use_diffuse_background: True  # Include Diffuse Background Emission -- was `true` with no diffuse_template_path set below; this went unnoticed while DRIPSSeeder read this from a nonexistent `paths.*` key (fixed to `diffuse.*`), which silently disabled it. Set back to true once a real Hermes template path is provided.
+  diffuse_template_path: /Users/rishi/Documents/Analysis/Sources/AstroImageDetection-fitmodel/HAWC-ImageProcessing-3MLFit/Minji-Hermes-allchan.fits.gz
+  # diffuse_template_path: /Users/rishi/Documents/Analysis/data/Hermes-allchan-wH2-large.fits.gz #Optional path to a DBE template file if use_diffuse_background is true
+  generate_diffuse_template: false #Set to true if you want to generate a diffuse background template, false otherwise  
+  free_diffuse_norm: true #Set to true if you want to free the normalization of the diffuse background model during fitting, false otherwise 
+# testing: 
+  # force_low_ts_source: 'Source0'
+
+likelihood_thresholds:  
+  point_source_detection: 25  
+  extension_test: 16  
+  spectrum_test: 16 
+
+error_and_TS:
+  error_point: false #Set to true if you want to compute the errors for point source phase, false otherwise
+  error_extension: false #Set to true if you want to compute the errors for extension test phase, false otherwise
+  error_spectrum: false #Set to true if you want to compute the errors for spectrum test phase, false otherwise
+  compute_TS_point: true #Set to true if you want to compute the TS for point sources, false otherwise
+
+##ALPS-specific settings (no DRIPS/image-processing equivalent). Shared settings
+##(coordinates, fitting.map_tree/detector_response/bins/estimator/fit_name/output_dir/
+##no_retries, fitting.alternate_spectral_models, roi.roi_radius/roi_template_path,
+##likelihood_thresholds.*, diffuse.*) are read from the sections above so both
+##DRIPS and ALPS are driven by this single config file.
+alps:
+  pixi_aerie_folder: /Users/rishi/Documents/Analysis/aerie #Local pixi project providing aerie-apps-get-local-extremum / aerie-apps-HealpixSigFluxMap
+  point_source_coord_range: 1.0 #Degrees of freedom allowed around a point-source seed position during fitting
+  extended_source_coord_range: 1.0 #Degrees of freedom allowed around an extended-source seed position during fitting
+  custom_parameter_boundaries_dict: null
+  include_old_diffuse_model: false
+  old_diffuse_model_min_l: null
+  old_diffuse_model_max_l: null
+  old_diffuse_model_sigma_b: 1.0
+  compute_optional_TS: true
+  compute_optional_uncertainties: true
+  use_fast_TS_estimate: false
+  start_from_raw_map: true
+  start_from_existing_yml_file_model: false
+  yml_file_model_path: null
+  start_from_existing_model_file_model: false
+  model_file_model_path: null
+  start_from_existing_fits_file_model: false
+  fits_file_model_path: null
+  trusted_source_list: null
+  trust_all_alterante_morphologies: false
+  trust_all_alternate_spectra: false
+  perform_point_source_adding_phase: true
+  perform_morpholgy_testing_phase: true
+  alternate_morpholgy_model_list: null #e.g. [Gaussian_on_sphere] to enable the extension-test phase
+  perform_spectrum_testing_phase: true
+  alternate_spectrum_model_list: null #e.g. [Log_parabola]; kept separate from fitting.alternate_spectral_models -- run_alt_hypothesis's baseline re-fit hits a real bug on already-frozen sources (TASKS.md Task 4, needs human review before enabling)
+  perform_final_fitting_phase: true
+  make_raw_data_map: false
+  make_model_map: false
+  make_optional_residual_map: true
+  plot_size_coord_1: 10.0
+  plot_size_coord_2: 10.0
+  log_local_path: Logs
+  fit_results_local_path: FitResults
+  raw_sig_map_local_path: DataMap
+  prev_models_local_path: Models
